@@ -1,0 +1,9 @@
+export type Color = 'pink'|'mint'|'peach'|'lavender'|'wild';
+export type Card = {id:string;value:number;color:Color};
+export type Requirement = {kind:'set'|'run'|'color';count:number};
+export type Combination = {id:string;ownerId:string;kind:Requirement['kind'];cards:Card[];values:number[]};
+export type Player = {id:string;session:string;name:string;avatar:string;hand:Card[];phase:number;completed:boolean;score:number;roundScore:number;lastSeen:number;bot:boolean;reaction?:{text:string;at:number}};
+export type Game = {code:string;status:'lobby'|'playing'|'round-end'|'finished';hostId:string;players:Player[];deck:Card[];discard:Card[];groups:Combination[];turn:number;step:'draw'|'play';round:number;version:number;createdAt:number;updatedAt:number;turnAt:number;timer:number;log:{id:string;text:string;at:number}[];winner?:string;roundWinner?:string;finishedAt?:number;demo:boolean};
+export type PublicPlayer = Omit<Player,'session'|'hand'|'lastSeen'> & {handCount:number;connected:boolean};
+export type View = Omit<Game,'deck'|'discard'|'players'> & {players:PublicPlayer[];deckCount:number;topDiscard:Card|null;hand:Card[];me:string|null};
+export type Action = {type:'start'|'draw'|'discard'|'phase'|'hit'|'next'|'reaction'|'add-bot'|'settings'|'rematch';source?:'deck'|'discard';cardId?:string;groups?:string[][];groupId?:string;side?:'start'|'end';text?:string;timer?:number;version?:number};

@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+const base=process.env.TEST_ORIGIN||'http://localhost:5173';
+function client(){let cookie='';return async(path,body)=>{const r=await fetch(base+path,{method:body?'POST':'GET',headers:{...(cookie?{cookie}:{}),...(body?{'Content-Type':'application/json',Origin:base}:{})},body:body?JSON.stringify(body):undefined});if(r.headers.get('set-cookie'))cookie=r.headers.get('set-cookie').split(';')[0];return {status:r.status,data:await r.json(),cookie};};}
+const a=client(),b=client(),stranger=client();
+const created=await a('/api/rooms',{name:'API Alex'});assert.equal(created.status,200);const code=created.data.code,path='/api/rooms/'+code;
+const joined=await b(path,{type:'join',name:'API Sam',avatar:'🦊'});assert.equal(joined.status,200);assert.equal(joined.data.players.length,2);
+const restored=await b(path,{type:'join',name:'ignored'});assert.equal(restored.data.me,joined.data.me);assert.equal(restored.data.players.length,2);
+assert.equal((await b(path,{type:'start'})).status,400);
+let g=(await a(path,{type:'start'})).data;assert.equal(g.hand.length,10);assert.equal(g.status,'playing');
+const outsider=await stranger(path);assert.equal(outsider.data.hand.length,0);assert.equal(outsider.data.me,null);assert.ok(!('deck' in g));assert.ok(g.players.every(p=>!('hand' in p)&&!('session' in p)));
+assert.equal((await b(path,{type:'draw'})).status,400);
+const parallel=await Promise.all([a(path,{type:'draw'}),a(path,{type:'draw'})]);assert.equal(parallel.filter(r=>r.status===200).length,1);g=(await a(path)).data;assert.equal(g.hand.length,11);
+assert.equal((await a(path,{type:'discard',cardId:'made-up'})).status,400);
+const reloaded=(await a(path)).data;assert.equal(reloaded.me,g.me);assert.deepEqual(reloaded.hand,g.hand);
+g=(await a(path,{type:'discard',cardId:g.hand[0].id})).data;assert.equal(g.turn,1);
+const bob=(await b(path)).data;assert.equal(bob.hand.length,10);assert.equal(bob.players[bob.turn].id,bob.me);
+const r=await fetch(base+path+'/events',{headers:{cookie:joined.cookie}});assert.equal(r.status,200);const reader=r.body.getReader();let event='';for(let n=0;n<5&&!event.includes('data: ');n++)event+=new TextDecoder().decode((await reader.read()).value);assert.ok(event.includes('data: '));assert.ok(!event.includes('"session"'));await reader.cancel();
+assert.equal((await stranger(path,{type:'draw'})).status,403);
+assert.equal((await stranger('/api/rooms/XXXXX')).status,404);
+console.log('Integration passed: two sessions, join/reconnect, server-authoritative turns, concurrent draw protection, hidden hands, SSE, and invalid rooms.');
